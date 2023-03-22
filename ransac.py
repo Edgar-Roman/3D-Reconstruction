@@ -62,6 +62,7 @@ def estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations):
 
     return best_R, best_t
 
+
 if __name__ == '__main__':
     camera_path = "/Users/alina/Desktop/3D-Reconstruction/data/statue/dslr_calibration_undistorted/cameras.txt"
     K = getCameraParams(camera_path)
