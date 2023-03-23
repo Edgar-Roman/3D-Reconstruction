@@ -42,14 +42,19 @@ def estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations):
         E, _ = cv2.findEssentialMat(pts1[indices], pts2[indices], K)
 
         # Decompose essential matrix into rotation and translation
-        _, R, t, _ = cv2.recoverPose(E, pts1[indices], pts2[indices], K)
+        _, R, t, _  = cv2.recoverPose(E, pts1[indices], pts2[indices], K)
 
         # Compute reprojection error for all feature point matches
-        pts1_proj = K @ pts1_homo.T
-        pts2_proj = K @ (R @ pts2_homo.T + t)
+        pts1_proj = (K @ pts1_homo.T).T
+        pts2_proj = (K @ (R @ pts2_homo.T + t)).T
+
+        # Normalize the homogeneous coordinates
+        pts1_proj /= pts1_proj[:, 2].reshape(-1, 1)
+        pts2_proj /= pts2_proj[:, 2].reshape(-1, 1)
+
         diff = pts2_proj - pts1_proj
         error = np.sum(diff * diff, axis=0)
-        print(error)
+        # print(error)
 
         # Count number of inliers
         num_inliers = np.sum(error < threshold)
