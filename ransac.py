@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 
+
 def getCameraParams(filename):
     K = np.zeros((3, 3))
     with open(filename, "r") as f:
@@ -42,7 +43,7 @@ def estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations):
         E, _ = cv2.findEssentialMat(pts1[indices], pts2[indices], K)
 
         # Decompose essential matrix into rotation and translation
-        _, R, t, _  = cv2.recoverPose(E, pts1[indices], pts2[indices], K)
+        _, R, t, _ = cv2.recoverPose(E, pts1[indices], pts2[indices], K)
 
         # Compute reprojection error for all feature point matches
         pts1_proj = (K @ pts1_homo.T).T

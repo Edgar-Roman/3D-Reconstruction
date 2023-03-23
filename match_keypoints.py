@@ -10,10 +10,14 @@ if __name__ == '__main__':
     img1 = cv.imread(os.path.join(DATA_DIR, "DSC_0490.JPG"), cv.IMREAD_GRAYSCALE)
     img2 = cv.imread(os.path.join(DATA_DIR, "DSC_0491.JPG"), cv.IMREAD_GRAYSCALE)
 
-    sift = cv.SIFT_create()
+    # sift = cv.SIFT_create()
+    orb = cv.ORB_create()
 
-    kp1, des1 = sift.detectAndCompute(img1, None)
-    kp2, des2 = sift.detectAndCompute(img2, None)
+    # kp1, des1 = sift.detectAndCompute(img1, None)
+    # kp2, des2 = sift.detectAndCompute(img2, None)
+
+    kp1, des1 = orb.detectAndCompute(img1, None)
+    kp2, des2 = orb.detectAndCompute(img2, None)
 
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1, des2, k=2)
