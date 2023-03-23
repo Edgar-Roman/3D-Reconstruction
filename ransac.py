@@ -1,22 +1,6 @@
 import numpy as np
 import cv2
-
-
-def getCameraParams(filename):
-    K = np.zeros((3, 3))
-    with open(filename, "r") as f:
-        for line in f:
-            if '#' in line:
-                continue
-            line = line.split()
-            fx, fy, cx, cy = float(line[4]), float(line[5]), float(line[6]), float(line[7])
-            K[0, 0] = fx
-            K[1, 1] = fy
-            K[0, 2] = cx
-            K[1, 2] = cy
-            K[2, 2] = 1
-    
-    return K
+import utils
 
 
 # Input:
@@ -54,7 +38,7 @@ def estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations):
         pts2_proj /= pts2_proj[:, 2].reshape(-1, 1)
 
         diff = pts2_proj - pts1_proj
-        error = np.sum(diff * diff, axis=0)
+        error = np.sum(diff * diff, axis=1)
         # print(error)
 
         # Count number of inliers
@@ -71,9 +55,11 @@ def estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations):
 
 if __name__ == '__main__':
     camera_path = "/Users/alina/Desktop/3D-Reconstruction/data/statue/dslr_calibration_undistorted/cameras.txt"
-    K = getCameraParams(camera_path)
+    K = utils.getCameraParams(camera_path)
     pts1 = np.load('query.npy')
     pts2 = np.load('train.npy')
+    print(pts1.shape)
+    print(pts2.shape)
     best_R, best_t = estimate_motion_RANSAC(pts1, pts2, K, 100, 100)
     
     print(best_R)
