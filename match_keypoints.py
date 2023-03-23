@@ -1,64 +1,38 @@
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import os
 
 
 DATA_DIR = './data/statue/images/dslr_images_undistorted/'
 
 
-def estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations):
-    best_R, best_t, best_inliers = None, None, 0
+def estimate_motion_RANSAC(pts1, pts2, K, threshold):
+    E, _ = cv.findEssentialMat(pts1, pts2, K, method=cv.RANSAC, threshold=threshold)
 
-    for _ in range(max_iterations):
-        # Randomly select 8 points to estimate the essential matrix
-        indices = np.random.choice(len(pts1), 8, replace=False)
-        selected_pts1 = pts1[indices]
-        selected_pts2 = pts2[indices]
+    # Decompose the essential matrix into rotation and translation
+    num_inliers, R, t, _ = cv.recoverPose(E, pts1, pts2, K)
 
-        # Estimate the essential matrix
-        E, _ = cv.findEssentialMat(selected_pts1, selected_pts2, K, method=cv.RANSAC, threshold=threshold)
+    return R, t, num_inliers
 
-        # Decompose the essential matrix into rotation and translation
-        num_inliers, R, t, _ = cv.recoverPose(E, selected_pts1, selected_pts2, K)
 
-        if num_inliers > best_inliers:
-            best_inliers = num_inliers
-            best_R = R
-            best_t = t
+def triangulate(pts1, pts2, R, t, K):
+    # Normalize the points
+    pts1_norm = cv.undistortPoints(pts1.reshape(-1, 1, 2), K, None).reshape(-1, 2)
+    pts2_norm = cv.undistortPoints(pts2.reshape(-1, 1, 2), K, None).reshape(-1, 2)
 
-    return best_R, best_t, best_inliers
+    # Convert the rotation and translation to a projection matrix
+    P1 = K @ np.hstack((np.identity(3), np.zeros((3, 1))))
+    P2 = K @ np.hstack((R, t))
 
-# def detectAndCompute():
-#     img1 = cv.imread(os.path.join(DATA_DIR, "DSC_0490.JPG"), cv.IMREAD_GRAYSCALE)
-#     img2 = cv.imread(os.path.join(DATA_DIR, "DSC_0491.JPG"), cv.IMREAD_GRAYSCALE)
-#
-#     # sift = cv.SIFT_create()
-#     akaze = cv.AKAZE_create()
-#
-#     # kp1, des1 = sift.detectAndCompute(img1, None)
-#     # kp2, des2 = sift.detectAndCompute(img2, None)
-#
-#     kp1, des1 = akaze.detectAndCompute(img1, None)
-#     kp2, des2 = akaze.detectAndCompute(img2, None)
-#
-#     bf = cv.BFMatcher()
-#     matches = bf.knnMatch(des1, des2, k=2)
-#
-#     good = []
-#     for m, n in matches:
-#         if m.distance < 0.7 * n.distance:
-#             good.append(m)
-#
-#     query = np.array([kp1[g[0].queryIdx].pt for g in good], dtype=np.float32)
-#     train = np.array([kp2[g[0].trainIdx].pt for g in good], dtype=np.float32)
-#
-#     np.save('query.npy', query)
-#     np.save('train.npy', train)
-#
-#     # cv.drawMatchesKnn expects list of lists as matches.
-#     img3 = cv.drawMatchesKnn(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-#     plt.imshow(img3), plt.show()
+    # Perform triangulation
+    pts4d_hom = cv.triangulatePoints(P1, P2, pts1_norm.T, pts2_norm.T)
+
+    # Convert homogeneous coordinates to 3D coordinates
+    pts3d = pts4d_hom[:3] / pts4d_hom[3]
+
+    return pts3d.T
 
 
 def detectAndCompute():
@@ -88,8 +62,8 @@ def detectAndCompute():
     np.save('query.npy', query)
     np.save('train.npy', train)
 
-    img3 = cv.drawMatches(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-    plt.imshow(img3), plt.show()
+    # img3 = cv.drawMatches(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    # plt.imshow(img3), plt.show()
 
 
 def getCameraParams(filename):
@@ -120,13 +94,27 @@ if __name__ == '__main__':
     # ...
 
     # Set RANSAC parameters
-    threshold = 2.0  # Reprojection error threshold (in pixels)
+    threshold = 1  # Reprojection error threshold (in pixels)
     max_iterations = 1000  # Maximum number of RANSAC iterations
 
     K = getCameraParams('./data/statue/dslr_calibration_undistorted/cameras.txt')
-    # Estimate the camera motion using RANSAC
-    R, t, inliers = estimate_motion_RANSAC(pts1, pts2, K, threshold, max_iterations)
+    print(K)
 
-    print("Rotation matrix:\n", R)
-    print("Translation vector:\n", t)
+    # Estimate the camera motion using RANSAC
+    R, t, inliers = estimate_motion_RANSAC(pts1, pts2, K, threshold)
+
+    # Triangulate the matched points
+    pts3d = triangulate(pts1, pts2, R, t, K)
+
+    # Plot 3D points
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(pts3d[0], pts3d[1], pts3d[2], c='r', marker='o')
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+    plt.show()
+
+
+    print("3D points:", pts3d)
     print("Number of inliers:", inliers)
