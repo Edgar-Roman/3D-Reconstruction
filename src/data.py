@@ -85,8 +85,7 @@ class StatueDataset:
 
     return np.array(images)
 
-  def _extractCameraIntrinsics(self) -> np.ndarray:
-    calibDir = glob('{}/*calibration*'.format(self._dataDir))[0]
+  def _extractCameraIntrinsics(self, calibDir: str) -> np.ndarray:
     cameraFile = glob('{}/cameras.txt'.format(calibDir))[0]
 
     intrinsics = []
@@ -101,18 +100,38 @@ class StatueDataset:
         intrinsics.append(intrinsic)
     return np.array(intrinsics)
 
+  def _extract2DPoints(self, calibDir: str) -> None:
+    imagesFile = glob('{}/images.txt'.format(calibDir))[0]
+    with open(imagesFile, 'r') as f:
+      data = f.readlines()[4:]
+      for i in range(0, len(data) // 2, 2):
+        imgId, qw, qx, qy, qz, tx, ty, tz, camId, name = data[i].strip().split()
+        data2 = np.array(data[i+1].split(), dtype=np.float32).reshape((-1, 3))
+        data2 = np.array([d for d in data2 if d[2] > -1])
+        print(imgId)
+        # pts2d = data2[:, :2]
+        # pts3dId = data2[:, 2].astype(np.int32)
+        # print(pts3dId)
+      
+
   def _extract(self) -> None:
     # Extract image data
     print('Extracting image data...')
     self._images = self._extractImages()
     
+    # Extract Calibration Parameters
+    calibDir = glob('{}/*calibration*'.format(self._dataDir))[0]
+
     # Extract camera parameters
-    self._intrinsics = self._extractCameraIntrinsics()
+    self._intrinsics = self._extractCameraIntrinsics(calibDir)
+
+    # Extract 2D points
+    self._extract2DPoints(calibDir)
 
     # Extract 3D points
-    
 
 
-
-root = str(Path(os.getcwd()).parent / 'data')
-statueset = StatueDataset(root)
+if __name__ == '__main__':
+  # Extract Statue Undistorted Data
+  root = str(Path(os.getcwd()).parent / 'data')
+  statueset = StatueDataset(root)
