@@ -6,6 +6,18 @@ import cv2
 from pathlib import Path
 from tqdm import tqdm
 from glob import glob
+from typing import Dict
+
+
+class ImageData:
+  def __init__(self, imageArr: np.ndarray, extrinsic: np.ndarray, cameraId: int,
+               points2d: np.ndarray, points3d: np.ndarray) -> None:
+    self._image = imageArr
+    self._extr = extrinsic
+    self._camId = cameraId
+    self._pts2d = points2d
+    self._pts3d = points3d
+
 
 """
 Class for downloading datasets available at https://www.eth3d.net/datasets
@@ -30,9 +42,9 @@ class StatueDataset:
 
   def __init__(self, root: str = os.getcwd(),
                datasetType: str = DATA_KEY_UNDISTORT) -> None:
-    self._images = np.zeros(0)
+    self._images = list()
     self._intrinsics = np.zeros(0)
-    self._points3d = np.zeros(0)
+    self._pts3dMap = dict()
     
     self._root = root
     self._dataDir = '{}/{}'.format(root, self._name)
@@ -73,19 +85,19 @@ class StatueDataset:
       with py7zr.SevenZipFile(self._downloadFile, 'r') as f:
         f.extractall(self._root)
 
-  def _extractImages(self) -> np.ndarray:
-    imageDir = glob('{}/images/*'.format(self._dataDir))[0]
-    imageFiles = glob('{}/*'.format(imageDir))
-    imageFiles.sort()
+  # def _extractImages(self) -> np.ndarray:
+  #   imageDir = glob('{}/images/*'.format(self._dataDir))[0]
+  #   imageFiles = glob('{}/*'.format(imageDir))
+  #   imageFiles.sort()
     
-    images = []
-    for imageFile in tqdm(imageFiles):
-      image = cv2.imread(imageFile)
-      images.append(image)
+  #   images = []
+  #   for imageFile in tqdm(imageFiles):
+  #     image = cv2.imread(imageFile)
+  #     images.append(image)
 
-    return np.array(images)
+  #   return np.array(images)
 
-  def _extractCameraIntrinsics(self, calibDir: str) -> np.ndarray:
+  def _extractCameraIntrinsics(self, calibDir: str) -> None:
     cameraFile = glob('{}/cameras.txt'.format(calibDir))[0]
 
     intrinsics = []
@@ -98,37 +110,52 @@ class StatueDataset:
           [0, 0, 1]
         ]).astype(np.float32)
         intrinsics.append(intrinsic)
-    return np.array(intrinsics)
+    self._intrinsics = np.array(intrinsics)
 
-  def _extract2DPoints(self, calibDir: str) -> None:
+  def _extract3DPoints(self, calibDir: str) -> None:
+    pts3dMap = {}
+    points3dFile = '{}/points3D.txt'.format(calibDir)
+    with open(points3dFile, 'r') as f:
+      data = f.readlines()[3:]
+      for line in data:
+        datum = line.strip().split()
+        ptsId, x, y, z, r, g, b, err = datum[:8]
+        pts3dMap[int(ptsId)] = np.array((x, y, z), dtype=np.float32)
+    self._pts3dMap = pts3dMap
+
+  def _extractImageData(self, calibDir: str) -> None:
     imagesFile = glob('{}/images.txt'.format(calibDir))[0]
     with open(imagesFile, 'r') as f:
       data = f.readlines()[4:]
-      for i in range(0, len(data) // 2, 2):
+      for i in range(0, len(data), 2):
         imgId, qw, qx, qy, qz, tx, ty, tz, camId, name = data[i].strip().split()
         data2 = np.array(data[i+1].split(), dtype=np.float32).reshape((-1, 3))
         data2 = np.array([d for d in data2 if d[2] > -1])
-        print(imgId)
+        
+        cv2
+        # extrinsic = np.array([
+
+        # ], dtype=np.float32)
         # pts2d = data2[:, :2]
         # pts3dId = data2[:, 2].astype(np.int32)
         # print(pts3dId)
-      
 
   def _extract(self) -> None:
-    # Extract image data
-    print('Extracting image data...')
-    self._images = self._extractImages()
-    
-    # Extract Calibration Parameters
+    # Extract calibration data
+    imageDir = '{}/images'.format(self._dataDir)
     calibDir = glob('{}/*calibration*'.format(self._dataDir))[0]
 
-    # Extract camera parameters
-    self._intrinsics = self._extractCameraIntrinsics(calibDir)
+    # Extract Camera Intrinsics
+    print('Extracting camera intrinsics...')
+    self._extractCameraIntrinsics(calibDir)
 
-    # Extract 2D points
-    self._extract2DPoints(calibDir)
+    # Extract 3D Points into Map
+    print('Extracting 3D points...')
+    self._extract3DPoints(calibDir)
 
-    # Extract 3D points
+    # Extract 2D Points and Image Data
+    print('Extracting image data')
+    self._extractImageData(calibDir)
 
 
 if __name__ == '__main__':

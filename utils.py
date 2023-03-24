@@ -13,5 +13,6 @@ def getCameraParams(filename):
             K[0, 2] = cx
             K[1, 2] = cy
             K[2, 2] = 1
+            
     
     return K
